@@ -1,0 +1,34 @@
+workflows:
+  questline-ios:
+    name: Questline iOS → TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: SimpleAI ASC Key   # name of your App Store Connect API key in Codemagic → Team integrations
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.simpleai.questline
+      vars:
+        APP_STORE_APPLE_ID: 0000000000      # Apple ID of the app (App Store Connect → App Information)
+      xcode: latest
+    scripts:
+      - name: Install XcodeGen
+        script: brew install xcodegen
+      - name: Generate Xcode project
+        script: xcodegen generate
+      - name: Use signing profiles
+        script: xcode-project use-profiles
+      - name: Set build number
+        script: |
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0)
+          agvtool new-version -all $((LATEST + 1))
+      - name: Build IPA
+        script: xcode-project build-ipa --project "Questline.xcodeproj" --scheme "Questline"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
